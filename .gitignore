@@ -1,0 +1,12 @@
+.pio/
+.pioenvs/
+.piolibdeps/
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+build/
+dist/
+*.o
+*.a
+*.elf

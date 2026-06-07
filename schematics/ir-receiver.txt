@@ -1,0 +1,49 @@
+IR Receiver Circuit
+====================
+
+Components:
+- CHQ1838 IR Receiver Module (38 kHz carrier)
+- 10μF capacitor (optional, for decoupling)
+
+Schematic:
+
+    CHQ1838 front view (dome facing you):
+
+         ┌──────────┐
+         │  ┌────┐  │
+         │  │ ██ │  │
+         │  └────┘  │
+         │          │
+         │  │  │  │ │
+         └──┼──┼──┼─┘
+            1  2  3
+
+    Pin 1 (OUT)  ──── GPIO14
+    Pin 2 (GND)  ──── GND
+    Pin 3 (VCC)  ──── 3.3V (NOT 5V!)
+
+Optional decoupling:
+
+    VCC ──┬── 10μF (+)
+          │    capacitor
+          └── 10μF (–) ──── GND
+
+Wiring:
+
+    CHQ1838 Pin 1 (OUT) ──► GPIO14 (IR receive data)
+    CHQ1838 Pin 2 (GND) ──► GND
+    CHQ1838 Pin 3 (VCC) ──► 3.3V
+
+⚠️  WARNING: Do NOT connect CHQ1838 VCC to 5V!
+    The module is rated for 3.3V only. 5V will
+    permanently damage the component.
+
+⚠️  WARNING: When using both IR LED and receiver,
+    keep them physically separated (at least 5cm)
+    to prevent the LED from blinding the receiver.
+
+Operation:
+  The CHQ1838 demodulates 38kHz IR signals and outputs
+  the decoded digital signal on the OUT pin. The ESP32
+  IRrecv library reads this signal via GPIO14 and
+  decodes it into a protocol and data value.
