@@ -1,0 +1,55 @@
+IR Transmitter Circuit
+======================
+
+Components:
+- ESP32 GPIO4
+- BC547 NPN Transistor
+- 100Ω Resistor (R1)
+- 10kΩ Resistor (R2)
+- 940nm IR LED (5mm)
+
+Schematic:
+
+                    +3.3V
+                      │
+                      │
+                     ╔╧╗
+                     ║ ║   IR LED 940nm
+                     ║ ║   (anode = top, long leg)
+                     ╚╤╝
+                      │
+                      ├────────── Collector (C)
+                      │          BC547 pin 2
+                      │
+    ESP32 GPIO4 ────┬─┴── R1 (100Ω) ──── Base (B)
+                    │                   BC547 pin 1
+                    │
+                    └── R2 (10kΩ)
+                        │
+                        GND
+
+                    Emitter (E) ──── GND
+                    BC547 pin 3
+
+BC547 Pinout (flat face toward you):
+
+    ┌────────┐
+    │  B  C  │
+    │        │
+    │   E    │
+    └────────┘
+
+B = Base     (1) — control from GPIO via 100Ω
+C = Collector (2) — connects to IR LED cathode
+E = Emitter   (3) — connects to GND
+
+Note: The 10kΩ pull-down resistor between Base and GND
+      prevents floating when GPIO is not actively driven.
+
+Operation:
+  GPIO HIGH → transistor conducts → IR LED lights
+  GPIO LOW  → transistor off → IR LED off
+
+The BC547 acts as a switch, allowing the 3.3V supply
+to drive the IR LED with more current than the GPIO pin
+could provide directly (~100mA vs ~12mA from GPIO).

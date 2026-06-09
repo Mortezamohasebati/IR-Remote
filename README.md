@@ -1,33 +1,34 @@
-<div align="center">
+# IR Remote — ESP32 Smart Infrared Controller
 
-# 📡 IR Remote — ESP32 Smart Infrared Controller
-
-**Control all your home appliances wirelessly via a beautiful mobile web interface.**  
+Control all your home appliances wirelessly via a beautiful web interface.  
 Built on ESP32 with IRremoteESP8266 — no app install required.
 
-[![ESP32](https://img.shields.io/badge/ESP32-DevKit%20V1-blue?style=flat-square&logo=espressif)](https://www.espressif.com/)
-[![IRremoteESP8266](https://img.shields.io/badge/Library-IRremoteESP8266-orange?style=flat-square)](https://github.com/crankyoldgit/IRremoteESP8266)
-[![Arduino](https://img.shields.io/badge/IDE-Arduino-teal?style=flat-square&logo=arduino)](https://www.arduino.cc/)
-[![WiFi](https://img.shields.io/badge/Network-Access%20Point-green?style=flat-square)]()
-
-</div>
+| Badge | |
+|-------|-|
+| [![ESP32](https://img.shields.io/badge/ESP32-DevKit%20V1-blue?logo=espressif)](https://www.espressif.com/) | [![IRremoteESP8266](https://img.shields.io/badge/Library-IRremoteESP8266-orange)](https://github.com/crankyoldgit/IRremoteESP8266) |
+| [![Arduino](https://img.shields.io/badge/IDE-Arduino-teal?logo=arduino)](https://www.arduino.cc/) | [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE) |
 
 ---
 
-## ✨ Features
+## Features
 
-- 📱 **Mobile-first web UI** — open in any browser, no app needed
-- 📺 **32 pre-loaded devices** across TVs, ACs, projectors, DVD players, and more
-- 🌍 **21 brands** — Samsung, LG, Sony, Philips, Panasonic, Xiaomi, Gree, Daikin, Epson, BenQ, and major Iranian brands (Snowa, Pakshoma, Pars Khazar, XVision, G-Plus, Emersan, Daewoo, Depoo, Electrostil, Entekhab)
-- 🧠 **IR Learning mode** — point any remote at the receiver and teach new buttons in seconds
-- ➕ **Add new devices** entirely from the web UI — no code editing needed
-- 💾 **Persistent memory** — learned codes survive power cycles (stored in ESP32 flash)
-- 📶 **Standalone Access Point** — ESP32 creates its own Wi-Fi, no router required
-- 🗂️ **Clean two-file architecture** — `ir_codes.h` (library) + `main.ino` (server)
+- **Mobile-first Apple Design System UI** — open in any browser, no app needed
+- **34 pre-loaded devices** across TVs, ACs, projectors, DVD players, fans, and more
+- **22 brands** including TCL, Hisense, Philips, Midea, Haier, and major Iranian brands
+- **IR Learning mode** — teach new buttons by pointing any remote at the receiver
+- **Live IRDB lookup** — fetch codes on-the-fly from the probonopd/irdb database (7-device LRU cache)
+- **Smart Home bridge** — control lamps, cooling, and alarm via companion ESP8266 board over I2C
+- **Vendor platform client** — REST API integration for IoT cloud platforms
+- **Scene automation** — trigger smart home actions from received IR codes
+- **Add new devices** entirely from the web UI — no code editing needed
+- **Persistent memory** — learned codes survive power cycles (ESP32 flash NVS)
+- **Standalone Access Point** — ESP32 creates its own Wi-Fi, no router required
+- **CSRF-protected** — all state-changing endpoints require an 8-byte hex token
+- **Rate-limited IR send** — max 10 requests/second on the `/ir` endpoint
 
 ---
 
-## 🛒 Hardware
+## Hardware
 
 | Component | Spec | Role |
 |-----------|------|------|
@@ -37,10 +38,11 @@ Built on ESP32 with IRremoteESP8266 — no app install required.
 | **Transistor BC547** | NPN | Drive IR LED (amplify GPIO current) |
 | **Resistor** | 100 Ω | Current limit for IR LED base |
 | **Resistor** | 10 kΩ | Pull-down on transistor base |
+| **ESP8266** (optional) | 80 MHz | Smart Home companion board |
 
 ---
 
-## 🔌 Wiring
+## Wiring
 
 ### IR Transmitter (Send)
 
@@ -62,162 +64,85 @@ CHQ1838 Pin 3 (VCC) ──► 3.3V   ⚠️ NOT 5V
 
 > **Important:** Always use **3.3V** for the CHQ1838 — 5V will damage it.
 
-### Wiring Diagram
+### Smart Home Companion (optional)
 
 ```
-                    ┌─────────────────────┐
-                    │    ESP32 DevKit V1   │
-    IR LED ◄── BC547◄── GPIO 4  [SEND ]   │
-   CHQ1838 ──────────► GPIO 14  [RECV ]   │
-                    │          3.3V / GND  │
-                    └─────────────────────┘
+ESP32 GPIO ──► I2C SDA ──► ESP8266
+ESP32 GPIO ──► I2C SCL ──► ESP8266
 ```
+
+The companion board firmware is at [vahidseyyedi/Arduino-Smart-Home](https://github.com/vahidseyyedi/Arduino-Smart-Home/).
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 IR-Remote/
-├── main.ino          # Web server, IR send/receive, learn mode logic
-└── ir_codes.h        # All device definitions and IR code library
-```
-
-### Adding a new device to the library
-
-Open `ir_codes.h` and follow this pattern:
-
-```cpp
-// 1. Define buttons
-IRButton myDeviceBtns[] = {
-  { "Power", "⏻", 0xXXXXXXXX, 32, 1 },
-  { "Vol+",  "🔊", 0xXXXXXXXX, 32, 1 },
-  // ...
-};
-
-// 2. Add to devices[] array at the bottom
-{ "my_device", "My Device", "tv", "BrandName", "تلویزیون",
-   PROTO_NEC, myDeviceBtns, 2 },
-```
-
-Supported protocols: `PROTO_NEC`, `PROTO_SAMSUNG`, `PROTO_SONY`, `PROTO_LG`, `PROTO_RC5`, `PROTO_SHARP`, `PROTO_PANASONIC`
-
----
-
-## ⚙️ Installation
-
-### 1. Install Arduino IDE
-Download from [arduino.cc/en/software](https://arduino.cc/en/software)
-
-### 2. Add ESP32 board support
-In **File → Preferences → Additional Boards Manager URLs**, paste:
-```
-https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
-```
-Then go to **Tools → Board → Boards Manager**, search `esp32`, and install.
-
-### 3. Install required libraries
-Go to **Sketch → Include Library → Manage Libraries** and install:
-
-| Library | Version |
-|---------|---------|
-| `IRremoteESP8266` | latest |
-| `ArduinoJson` | ≥ 6.x |
-
-### 4. Clone this repository
-```bash
-git clone https://github.com/Mortezamohasebati/IR-Remote.git
-```
-Or download the ZIP from GitHub and extract into your Arduino sketchbook folder.
-
-### 5. Select board and upload
-- **Tools → Board → ESP32 Arduino → ESP32 Dev Module**
-- **Tools → Port** → select your ESP32 COM port
-- Click **Upload** ⬆
-
-### 6. Connect and open
-After upload, open **Serial Monitor** at baud `115200`. You'll see:
-```
-=== IR Remote v2.0 ===
-AP: IR-Remote  |  IP: 192.168.4.1
-Server started.
-```
-On your phone, connect to Wi-Fi **`IR-Remote`** (password: `12345678`), then open:
-```
-http://192.168.4.1
+├── main.ino             # Entry point — setup, loop, route registration
+├── globals.h            # Shared extern declarations (server, irsend, shClient, etc.)
+├── ir_codes.h           # Static IR code library — 34 devices, all PROGMEM
+├── wifi_manager.h       # Self-contained AP+STA manager
+├── web_ui.h             # All HTTP handlers + Apple Design System HTML/CSS/JS
+├── smarthome_client.h   # HTTP client for the Smart Home companion board
+├── vendor_api.h         # Vendor platform REST API client
+├── scenes.h             # Scene automation — IR trigger → Smart Home action
+├── irdb_client.h        # IRDB CDN fetcher, CSV parser, LRU cache, protocol translator
+└── README.md
 ```
 
 ---
 
-## 📱 How to Use
-
-### Sending commands
-1. Open the web UI on your phone
-2. Pick a category tab: **TV / AC / Other**
-3. Filter by brand using the pills
-4. Tap a device card to expand its remote
-5. Tap any button — IR signal is sent instantly
-
-### Learning a new code
-1. Open a device's remote panel
-2. Tap **📡 Learn** button (top right of panel)
-3. Tap the button you want to teach
-4. Point your **original remote** at the CHQ1838 receiver and press the button
-5. The UI confirms with a green dot ✅ — code is saved to flash
-
-### Adding a completely new device
-1. Tap **➕ New Device** card in any category
-2. Enter device name, brand, and category
-3. Select which buttons to teach
-4. Follow the on-screen learning prompts one by one
-5. Device appears permanently in the list
-
----
-
-## 🗂️ Supported Devices
+## Supported Devices (34 total)
 
 <details>
-<summary><strong>📺 TVs (13 devices)</strong></summary>
+<summary><strong>TVs (16 devices)</strong></summary>
 
-| Brand | Protocol |
-|-------|---------|
-| Samsung | SAMSUNG |
-| LG | NEC |
-| Sony | SONY |
-| Philips | RC5 |
-| Xiaomi | NEC |
-| Panasonic | PANASONIC |
-| Snowa (اسنوا) | NEC |
-| Pakshoma (پاکشوما) | NEC |
-| Pars Khazar (پارس خزر) | NEC |
-| XVision (ایکس‌ویژن) | SAMSUNG |
-| G-Plus (جی‌پلاس) | NEC |
-| Emersan (امرسان) | SAMSUNG |
-| Daewoo (دوو) | NEC |
+| Brand | Protocol | Notes |
+|-------|----------|-------|
+| Samsung | SAMSUNG | |
+| LG | NEC | |
+| Sony | SONY12/SONY15 | |
+| Philips | RC5 | |
+| Philips | RC6 | 20-bit variant |
+| Xiaomi | NEC | |
+| Panasonic | PANASONIC | |
+| TCL (NA/Roku) | NEC | device=0x57E3 |
+| TCL (Asia/China) | RCA | device=15 (from irdb) |
+| Hisense | NEC | addr 0x04 |
+| Snowa (اسنوا) | NEC | |
+| Pakshoma (پاکشوما) | NEC | |
+| Pars Khazar (پارس خزر) | NEC | |
+| XVision (ایکس‌ویژن) | SAMSUNG | |
+| G-Plus (جی‌پلاس) | NEC | |
+| Emersan (امرسان) | SAMSUNG | |
+| Daewoo (دوو) | NEC | |
 
 </details>
 
 <details>
-<summary><strong>❄️ Air Conditioners (11 devices)</strong></summary>
+<summary><strong>Air Conditioners (13 devices)</strong></summary>
 
-| Brand | Protocol |
-|-------|---------|
-| Samsung | SAMSUNG |
-| LG | NEC |
-| Panasonic | PANASONIC |
-| Daikin | NEC |
-| Mitsubishi | NEC |
-| Gree | NEC |
-| Snowa (اسنوا) | NEC |
-| Entekhab (انتخاب) | NEC |
-| Depoo (دپو) | NEC |
-| Electrostil (الکترواستیل) | NEC |
-| Pakshoma (پاکشوما) | NEC |
+| Brand | Protocol | Notes |
+|-------|----------|-------|
+| Samsung | SAMSUNG | |
+| LG | NEC | |
+| Panasonic | PANASONIC | |
+| Daikin | NEC | |
+| Mitsubishi | NEC | |
+| Gree | NEC | |
+| Midea | NEC | addr 0x00; verify on real unit |
+| Haier | N/A | placeholder 8-bit; use learn mode |
+| Snowa (اسنوا) | NEC | |
+| Entekhab (انتخاب) | NEC | |
+| Depoo (دپو) | NEC | |
+| Electrostil (الکترواستیل) | NEC | |
+| Pakshoma (پاکشوما) | NEC | |
 
 </details>
 
 <details>
-<summary><strong>📽️ Other (8 devices)</strong></summary>
+<summary><strong>Other (8 devices)</strong></summary>
 
 | Device | Brand |
 |--------|-------|
@@ -233,55 +158,162 @@ http://192.168.4.1
 
 ---
 
-## 🛠️ Configuration
+## API Reference
 
-All settings are at the top of `main.ino`:
+All endpoints return JSON. State-changing endpoints require CSRF token (see below).
 
-```cpp
-// Wi-Fi Access Point
-const char* AP_SSID     = "IR-Remote";   // change network name
-const char* AP_PASSWORD = "12345678";    // change password (min 8 chars)
+### CSRF Protection
 
-// GPIO pins
-const uint16_t IR_SEND_PIN = 4;    // IR LED transmitter
-const uint16_t IR_RECV_PIN = 14;   // CHQ1838 receiver
+```
+GET /csrf
+→ {"token":"a1b2c3d4e5f67890"}
 
-// Learn timeout (ms)
-const uint32_t LEARN_TIMEOUT = 15000;  // 15 seconds
+Include token in all POST/DELETE requests as:
+  • Query arg:  ?csrf=a1b2c3d4e5f67890
+  • Header:     X-CSRF-Token: a1b2c3d4e5f67890
+```
+
+### IR Control
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/ir?device=X&btn=Y` | Send IR code (learned → library → IRDB fallback) |
+| `GET` | `/devices` | List all devices with buttons + learned status |
+
+### Learning
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/learn/start` | Begin learning a button — body: `device=X&btn=Y&csrf=Z` |
+| `GET` | `/learn/status` | Poll learning status (waiting/done/timeout/idle) |
+| `POST` | `/learn/cancel` | Cancel active learning — body: `csrf=Z` |
+| `POST` | `/learn/delete` | Delete a learned code — body: `device=X&btn=Y&csrf=Z` |
+
+### IRDB (Live Code Lookup)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/irdb/brands?type=TV` | List brands for device type |
+| `GET` | `/irdb/codes?brand=X&type=TV` | List available IR codes |
+| `GET` | `/irdb` | IRDB browser UI |
+
+### Smart Home Bridge
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/smarthome` | Smart Home dashboard UI |
+| `GET/POST` | `/smarthome/config` | Get/set companion board IP |
+| `GET` | `/smarthome/sensors` | Read sensor data (temp, humidity, light, gas, alarm) |
+| `POST` | `/smarthome/device` | Toggle device: `{"device":"lamp","status":true}` |
+| `POST` | `/smarthome/alarm` | Toggle alarm: `{"status":true}` |
+| `POST` | `/smarthome/smart` | Set smart mode: `{"status":0}` (0=off, 1=LDR, 2=PIR) |
+
+### Scenes
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/scenes` | List all scenes |
+| `POST` | `/scenes` | Create scene: `{"name":"...","trigger":{"device":"...","btn":"..."},"action":{"type":"device","device":"lamp","state":true}}` |
+| `DELETE` | `/scenes?id=X` | Delete scene |
+
+### Vendor Platform
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/vendor` | Vendor configuration UI |
+| `GET/POST` | `/vendor/config` | Get/set vendor API credentials |
+
+### Wi-Fi
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/wifi/status` | Check STA connection status |
+| `GET` | `/wifi/config` | Configure Wi-Fi (requires CSRF) |
+
+---
+
+## Installation
+
+### 1. Install Arduino IDE
+
+Download from [arduino.cc/en/software](https://arduino.cc/en/software)
+
+### 2. Add ESP32 board support
+
+In **File → Preferences → Additional Boards Manager URLs**, paste:
+```
+https://raw.githubusercontent.com/espressif/arduino-esp32/gh-packages/package_esp32_index.json
+```
+Then **Tools → Board → Boards Manager**, search `esp32`, and install **ESP32 Arduino** (v3.x).
+
+### 3. Install required libraries
+
+**Sketch → Include Library → Manage Libraries**:
+
+| Library | Version |
+|---------|---------|
+| `IRremoteESP8266` | ≥ 2.9.0 |
+| `ArduinoJson` | ≥ 6.x |
+
+### 4. Clone and open
+
+```bash
+git clone https://github.com/Mortezamohasebati/IR-Remote.git
+```
+
+Open the `IR-Remote` folder in Arduino IDE — it auto-detects the sketch.
+
+### 5. Select board and upload
+
+- **Tools → Board → ESP32 Arduino → ESP32 Dev Module**
+- **Tools → Port** → select your ESP32 COM port
+- Click **Upload**
+
+### 6. Connect
+
+After upload, open **Serial Monitor** at 115200 baud:
+```
+=== IR Remote v2.0 ===
+AP: IR-Remote  |  IP: 192.168.4.1
+Server started.
+```
+
+On your phone, connect to Wi-Fi `IR-Remote` (password: `12345678`), then open:
+```
+http://192.168.4.1
 ```
 
 ---
 
-## 🔧 Troubleshooting
+## Configuration
+
+Settings at the top of `main.ino`:
+
+```cpp
+const uint16_t IR_SEND_PIN = 4;    // IR LED transmitter GPIO
+const uint16_t IR_RECV_PIN = 14;   // CHQ1838 receiver GPIO
+const uint16_t CAPTURE_BUF = 1024; // IR capture buffer size
+const uint32_t LEARN_TIMEOUT = 15000; // 15 seconds
+```
+
+Wi-Fi AP credentials in `wifi_manager.h` (default: SSID `IR-Remote`, password `12345678`).
+
+---
+
+## Troubleshooting
 
 | Problem | Solution |
 |---------|----------|
-| Can't connect to `IR-Remote` Wi-Fi | Reset ESP32, wait 5 seconds and retry |
+| Can't connect to `IR-Remote` Wi-Fi | Reset ESP32, wait 5 seconds, retry |
 | Page doesn't load at 192.168.4.1 | Make sure you're on the `IR-Remote` network, not your home Wi-Fi |
 | Button press does nothing | Check IR LED wiring — BC547 pin order (B, C, E) |
-| Learning mode times out | Hold the original remote **5–10 cm** from CHQ1838, aim directly |
-| Wrong device responds | IR codes in library are typical values; use Learn mode to override with your exact remote's codes |
-| Upload fails | Hold the **BOOT** button on ESP32 while clicking Upload, release after upload starts |
+| Learning mode times out | Hold original remote **5–10 cm** from CHQ1838, aim directly |
+| Wrong codes for TCL | Try both TCL entries — NEC for Roku models, RCA for Asia/China models |
+| Smart Home board unreachable | Verify IP in `/smarthome/config`, ensure companion board is powered |
+| Upload fails | Hold **BOOT** button on ESP32 while clicking Upload, release after upload starts |
 
 ---
 
-## 🤝 Contributing
+## License
 
-Pull requests are welcome. To add a new brand:
-
-1. Fork the repo
-2. Add button array and device entry in `ir_codes.h`
-3. Test on real hardware
-4. Open a PR with the brand name and device model in the title
-
----
-
-## 📄 License
-
-This project is open source and free to use for personal and educational purposes.
-
----
-
-<div align="center">
-Made with ❤️ by <a href="https://github.com/Mortezamohasebati">Morteza Mohasebati</a>
-</div>
+MIT — free to use for personal and educational purposes.
