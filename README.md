@@ -13,7 +13,7 @@ Built on ESP32 with IRremoteESP8266 — no app install required.
 ## Features
 
 - **Mobile-first Apple Design System UI** — open in any browser, no app needed
-- **37 pre-loaded devices** across TVs, ACs, projectors, DVD players, fans, and more
+- **34 pre-loaded devices** across TVs, ACs, projectors, DVD players, fans, and more
 - **22 brands** including TCL, Hisense, Philips, Midea, Haier, and major Iranian brands
 - **IR Learning mode** — teach new buttons by pointing any remote at the receiver
 - **Live IRDB lookup** — fetch codes on-the-fly from the probonopd/irdb database (7-device LRU cache)
@@ -81,7 +81,7 @@ The companion board firmware is at [vahidseyyedi/Arduino-Smart-Home](https://git
 IR-Remote/
 ├── main.ino             # Entry point — setup, loop, route registration
 ├── globals.h            # Shared extern declarations (server, irsend, shClient, etc.)
-├── ir_codes.h           # Static IR code library — 37 devices, all PROGMEM
+├── ir_codes.h           # Static IR code library — 34 devices, all PROGMEM
 ├── wifi_manager.h       # Self-contained AP+STA manager
 ├── web_ui.h             # All HTTP handlers + Apple Design System HTML/CSS/JS
 ├── smarthome_client.h   # HTTP client for the Smart Home companion board
@@ -93,7 +93,7 @@ IR-Remote/
 
 ---
 
-## Supported Devices (37 total)
+## Supported Devices (34 total)
 
 <details>
 <summary><strong>TVs (16 devices)</strong></summary>
@@ -184,10 +184,10 @@ Include token in all POST/DELETE requests as:
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/learn/start?device=X&btn=Y&csrf=Z` | Begin learning a button |
+| `POST` | `/learn/start` | Begin learning a button — body: `device=X&btn=Y&csrf=Z` |
 | `GET` | `/learn/status` | Poll learning status (waiting/done/timeout/idle) |
-| `GET` | `/learn/cancel?csrf=Z` | Cancel active learning |
-| `GET` | `/learn/delete?device=X&btn=Y&csrf=Z` | Delete a learned code |
+| `POST` | `/learn/cancel` | Cancel active learning — body: `csrf=Z` |
+| `POST` | `/learn/delete` | Delete a learned code — body: `device=X&btn=Y&csrf=Z` |
 
 ### IRDB (Live Code Lookup)
 

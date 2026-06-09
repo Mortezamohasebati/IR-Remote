@@ -37,7 +37,7 @@ X-CSRF-Token: a1b2c3d4e5f67890
 GET /devices
 ```
 
-Returns all 37 static devices with their buttons and learned status.
+Returns all static devices (34 entries) with their buttons and learned status.
 
 ```json
 [
@@ -88,7 +88,9 @@ Errors:
 
 ### Start learning
 ```
-GET /learn/start?device=<id>&btn=<name>&csrf=<token>
+POST /learn/start
+  Content-Type: application/x-www-form-urlencoded
+  Body: device=<id>&btn=<name>&csrf=<token>
 ```
 
 Enables IR receiver and waits for a signal.
@@ -116,7 +118,9 @@ States:
 
 ### Cancel learning
 ```
-GET /learn/cancel?csrf=<token>
+POST /learn/cancel
+  Content-Type: application/x-www-form-urlencoded
+  Body: csrf=<token>
 ```
 
 ```json
@@ -125,7 +129,9 @@ GET /learn/cancel?csrf=<token>
 
 ### Delete learned code
 ```
-GET /learn/delete?device=<id>&btn=<name>&csrf=<token>
+POST /learn/delete
+  Content-Type: application/x-www-form-urlencoded
+  Body: device=<id>&btn=<name>&csrf=<token>
 ```
 
 Removes a previously learned override for a specific button.
@@ -338,3 +344,48 @@ Connects to an existing Wi-Fi network in STA mode. The Access Point remains avai
 | 405 | Wrong HTTP method |
 | 429 | Rate limit exceeded (IR endpoint) |
 | 502 | Upstream (companion board) unreachable |
+
+---
+
+## Build & Compile
+
+### Dependencies (PlatformIO)
+
+```ini
+[env:esp32dev]
+platform = espressif32
+board = esp32dev
+framework = arduino
+lib_deps =
+  crankyoldgit/IRremoteESP8266@^2.9.0
+  bblanchon/ArduinoJson@^6.21.0
+```
+
+### Dependencies (Arduino IDE)
+- `IRremoteESP8266` by crankyoldgit (≥2.9.0)
+- `ArduinoJson` by bblanchon (≥6.21.0)
+
+### Compile checklist
+
+| # | Check | Why |
+|---|-------|-----|
+| 1 | `IRremoteESP8266` ≥2.9.0 installed | Core IR send/receive library |
+| 2 | `ArduinoJson` ≥6.21.0 installed | JSON parsing (learned codes, scenes, irdb) |
+| 3 | Board set to `ESP32 Dev Module` (or specific variant) | Project targets ESP32, not ESP8266 or other |
+| 4 | Partition scheme: `Default 4MB with spiffs (1.2MB APP/1.5MB SPIFFS)` | NVS + Preferences need SPIFFS partition |
+| 5 | Flash mode: `QIO` / `80MHz` / 4MB flash | Standard ESP32 DevKit config |
+| 6 | Enable compiler warnings (`-Wall`) | Catches unused variables, type mismatches |
+| 7 | Verify `PROGMEM` attribute on all device/button arrays | Without it, strings corrupt when reading from flash |
+| 8 | Check serial monitor at **115200 baud** | Must match `Serial.begin(115200)` |
+| 9 | Verify GPIO 4 = IR LED, GPIO 14 = CHQ1838 output | Physical wiring must match pin constants |
+| 10 | Test `/csrf` returns a 16-char hex token | CSRF system generates at boot via `esp_random()` |
+
+### Common compile errors
+
+| Error | Likely cause |
+|-------|-------------|
+| `'decode_type_t' does not name a type` | `IRremoteESP8266.h` not included (missing dep or wrong include path) |
+| `'IRsend' was not declared in this scope` | Library not installed or board not set to ESP32 |
+| `undefined reference to 'loopReceive'` | `web_ui.h` not included or typo in function name |
+| `PROGMEM data declared in function scope` | Button/device arrays must be at file scope, not inside a function |
+| `JSON buffer too small` | `DynamicJsonDocument` capacity too low for serialized data |

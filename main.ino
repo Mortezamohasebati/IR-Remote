@@ -54,11 +54,11 @@ char csrfToken[17];
 // ════════════════════════════════════════════════════════════
 //  IR code matching helpers
 // ════════════════════════════════════════════════════════════
-String findIRInLibrary(uint64_t code, uint8_t proto, String& outBtn) {
+String findIRInLibrary(uint64_t code, decode_type_t proto, String& outBtn) {
   // Check learned codes first
   for (int i = 0; i < DEVICE_COUNT; i++) {
     for (int j = 0; j < devices[i].btnCount; j++) {
-      uint64_t lCode; uint8_t lBits, lProto;
+      uint64_t lCode; uint8_t lBits; decode_type_t lProto;
       if (loadLearnedCode(devices[i].id, devices[i].buttons[j].name, lCode, lBits, lProto)) {
         if (lCode == code && lProto == proto) {
           outBtn = devices[i].buttons[j].name;
@@ -70,7 +70,7 @@ String findIRInLibrary(uint64_t code, uint8_t proto, String& outBtn) {
   // Check static library
   for (int i = 0; i < DEVICE_COUNT; i++) {
     for (int j = 0; j < devices[i].btnCount; j++) {
-      if (devices[i].buttons[j].code == code && (uint8_t)devices[i].protocol == proto) {
+      if (devices[i].buttons[j].code == code && devices[i].protocol == proto) {
         outBtn = devices[i].buttons[j].name;
         return devices[i].id;
       }
@@ -90,9 +90,9 @@ void loopReceive() {
       results.decode_type != decode_type_t::GLOBALCACHE &&
       results.value != 0xFFFFFFFF) {
 
-    uint64_t code  = results.value;
-    uint8_t  bits  = results.bits;
-    uint8_t  proto = (uint8_t)results.decode_type;
+    uint64_t    code  = results.value;
+    uint8_t     bits  = results.bits;
+    decode_type_t proto = results.decode_type;
 
     if (learnMode) {
       // Save learned code
@@ -143,10 +143,10 @@ void setup() {
   server.on("/devices",       HTTP_GET,  handleDeviceList);
   server.on("/csrf",          HTTP_GET,  handleCSRFToken);
   server.on("/ir",            HTTP_GET,  handleIRSend);
-  server.on("/learn/start",   HTTP_GET,  handleLearnStart);
+  server.on("/learn/start",   HTTP_POST, handleLearnStart);
   server.on("/learn/status",  HTTP_GET,  handleLearnStatus);
-  server.on("/learn/cancel",  HTTP_GET,  handleLearnCancel);
-  server.on("/learn/delete",  HTTP_GET,  handleLearnDelete);
+  server.on("/learn/cancel",  HTTP_POST, handleLearnCancel);
+  server.on("/learn/delete",  HTTP_POST, handleLearnDelete);
   server.on("/wifi/status",   HTTP_GET,  handleWiFiStatus);
   server.on("/wifi/config",   HTTP_GET,  handleWiFiConfig);
   server.on("/irdb/brands",   HTTP_GET,  handleIRDBBrands);

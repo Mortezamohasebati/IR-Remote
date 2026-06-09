@@ -50,7 +50,7 @@ String learnKey(String devId, String btnName) {
   return "L_" + devId + "_" + btnName;
 }
 
-void saveLearnedCode(String devId, String btnName, uint64_t code, uint8_t bits, uint8_t proto) {
+void saveLearnedCode(String devId, String btnName, uint64_t code, uint8_t bits, decode_type_t proto) {
   prefs.begin("irlearn", false);
   String k = learnKey(devId, btnName);
   String val = String((uint32_t)(code >> 32), HEX) + ":" +
@@ -60,7 +60,7 @@ void saveLearnedCode(String devId, String btnName, uint64_t code, uint8_t bits, 
   prefs.end();
 }
 
-bool loadLearnedCode(String devId, String btnName, uint64_t &code, uint8_t &bits, uint8_t &proto) {
+bool loadLearnedCode(String devId, String btnName, uint64_t &code, uint8_t &bits, decode_type_t &proto) {
   prefs.begin("irlearn", true);
   String k = learnKey(devId, btnName);
   if (!prefs.isKey(k.c_str())) { prefs.end(); return false; }
@@ -84,19 +84,18 @@ void deleteLearnedCode(String devId, String btnName) {
 
 // ── IR send ─────────────────────────────────────────────────
 
-void sendCode(IRProtocol proto, uint64_t code, uint8_t bits, uint8_t repeat) {
+void sendCode(decode_type_t proto, uint64_t code, uint8_t bits, uint8_t repeat) {
   for (int r = 0; r < repeat; r++) {
     switch (proto) {
-      case PROTO_NEC:        irsend.sendNEC(code, bits);        break;
-      case PROTO_SAMSUNG:    irsend.sendSAMSUNG(code, bits);    break;
-      case PROTO_SONY:       irsend.sendSony(code, bits);       break;
-      case PROTO_LG:         irsend.sendLG(code, bits);         break;
-      case PROTO_RC5:        irsend.sendRC5(code, bits);        break;
-      case PROTO_SHARP:      irsend.sendSharpRaw(code, bits);   break;
-      case PROTO_RC6:        irsend.sendRC6(code, bits);        break;
-      case PROTO_RCA:        irsend.sendNEC(code, bits);        break;
-      case PROTO_PANASONIC:  irsend.sendPanasonic(bits, code);  break;
-      default:               irsend.sendNEC(code, bits);        break;
+      case NEC:        irsend.sendNEC(code, bits);        break;
+      case SAMSUNG:    irsend.sendSAMSUNG(code, bits);    break;
+      case SONY:       irsend.sendSony(code, bits);       break;
+      case LG:         irsend.sendLG(code, bits);         break;
+      case RC5:        irsend.sendRC5(code, bits);        break;
+      case SHARP:      irsend.sendSharpRaw(code, bits);   break;
+      case RC6:        irsend.sendRC6(code, bits);        break;
+      case PANASONIC:  irsend.sendPanasonic(bits, code);  break;
+      default:         irsend.sendNEC(code, bits);        break;
     }
     if (repeat > 1) delay(45);
   }
@@ -118,7 +117,7 @@ String buildDevicesJSON() {
     JsonArray btns = obj.createNestedArray("btns");
     for (int j = 0; j < d.btnCount; j++) {
       IRButton& b = d.buttons[j];
-      uint64_t lCode; uint8_t lBits, lProto;
+  uint64_t lCode; uint8_t lBits; decode_type_t lProto;
       bool hasLearned = loadLearnedCode(d.id, b.name, lCode, lBits, lProto);
       JsonObject btnObj = btns.createNestedObject();
       btnObj["name"]    = b.name;
@@ -149,9 +148,9 @@ void handleIRSend() {
     return;
   }
 
-  uint64_t lCode; uint8_t lBits, lProto;
+  uint64_t lCode; uint8_t lBits; decode_type_t lProto;
   if (loadLearnedCode(devId, btnName, lCode, lBits, lProto)) {
-    sendCode((IRProtocol)lProto, lCode, lBits, 1);
+    sendCode(lProto, lCode, lBits, 1);
     Serial.printf("[IR-L] %s > %s  code=0x%llX\n", devId.c_str(), btnName.c_str(), lCode);
     server.send(200, "application/json", "{\"ok\":true,\"src\":\"learned\"}");
     return;
@@ -643,6 +642,8 @@ void handleSmartHomePage() {
   .smart-mode button{flex:1;padding:10px;border-radius:10px;border:1px solid #2a2a3d;background:transparent;color:#6b6882;font-size:12px;cursor:pointer;font-family:inherit;margin:0}
   .smart-mode button:active{transform:scale(.95)}
   .smart-mode button.active{background:#7c6af5;color:#fff;border-color:#7c6af5}
+  .sensor-banner{display:none;background:#e44d7b22;border:1px solid #e44d7b44;border-radius:10px;padding:10px;margin-top:8px;font-size:13px;color:#e44d7b;text-align:center}
+  .sensor-banner.show{display:block}
 </style>
 </head><body>
 <a href="/" class="back">← Back</a>
@@ -652,12 +653,13 @@ void handleSmartHomePage() {
   <input type="text" id="shIp" value="192.168.4.1" placeholder="192.168.4.1">
   <div style="display:flex;gap:8px">
     <button onclick="saveIP()">Save</button>
-    <button class="secondary" onclick="loadSensors()">Refresh</button>
+    <button class="secondary" onclick="retrySensorPoll()">Refresh</button>
   </div>
   <div class="conn-status" id="connStatus">
     <span class="conn-dot fail" id="connDot"></span>
     <span id="connText">Not connected</span>
   </div>
+  <div id="sensorBanner" class="sensor-banner">Board unreachable — polling stopped <button onclick="retrySensorPoll()" style="margin-left:8px;padding:4px 12px;border-radius:980px;border:1px solid #e44d7b;background:transparent;color:#e44d7b;cursor:pointer;font-family:inherit;font-size:12px">Retry</button></div>
 </div>
 <div class="card">
   <h3 style="font-size:15px;margin-bottom:12px">Sensors</h3>
@@ -705,10 +707,10 @@ void handleSmartHomePage() {
   <div id="sceneList"></div>
 </div>
 <script>
-let sensorPoll=null;let CSRFToken='';
+let sensorFailCount=0;let sensorTimer=null;let sensorStopped=false;let CSRFToken='';
 fetch('/csrf').then(r=>r.json()).then(d=>CSRFToken=d.token);
-async function saveIP(){const ip=document.getElementById('shIp').value.trim();if(!ip)return;await fetch('/smarthome/config?csrf='+CSRFToken,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'ip='+encodeURIComponent(ip)});loadSensors()}
-async function loadSensors(){try{const r=await fetch('/smarthome/sensors');const d=await r.json();const ok=d.ok;document.getElementById('connDot').className='conn-dot '+(ok?'ok':'fail');document.getElementById('connText').textContent=ok?'Connected':'Failed to reach board';if(!ok)return;document.getElementById('sTemp').textContent=d.temperature!==null?d.temperature+'°C':'--';document.getElementById('sHum').textContent=d.humidity!==null?d.humidity+'%':'--';document.getElementById('sLight').textContent=d.light!==null?d.light+'%':'--';document.getElementById('sGas').textContent=d.gas!==null?d.gas+'%':'--';const alarmDot=document.getElementById('alarmDot');const alarmLabel=document.getElementById('alarmLabel');if(d.alarm){alarmDot.className='alarm-dot active';alarmLabel.textContent='Alarm: Triggered!'}else{alarmDot.className='alarm-dot';alarmLabel.textContent='Alarm: Inactive'}}catch(e){document.getElementById('connDot').className='conn-dot fail';document.getElementById('connText').textContent='Connection error';document.getElementById('sTemp').textContent='--';document.getElementById('sHum').textContent='--';document.getElementById('sLight').textContent='--';document.getElementById('sGas').textContent='--'}}
+async function saveIP(){const ip=document.getElementById('shIp').value.trim();if(!ip)return;await fetch('/smarthome/config?csrf='+CSRFToken,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'ip='+encodeURIComponent(ip)});retrySensorPoll()}
+async function loadSensors(){if(sensorStopped)return;try{const r=await fetch('/smarthome/sensors');const d=await r.json();const ok=d.ok;sensorFailCount=0;document.getElementById('connDot').className='conn-dot '+(ok?'ok':'fail');document.getElementById('connText').textContent=ok?'Connected':'Failed to reach board';document.getElementById('sensorBanner').classList.remove('show');if(!ok){scheduleSensorPoll();return}document.getElementById('sTemp').textContent=d.temperature!==null?d.temperature+'°C':'--';document.getElementById('sHum').textContent=d.humidity!==null?d.humidity+'%':'--';document.getElementById('sLight').textContent=d.light!==null?d.light+'%':'--';document.getElementById('sGas').textContent=d.gas!==null?d.gas+'%':'--';const alarmDot=document.getElementById('alarmDot');const alarmLabel=document.getElementById('alarmLabel');if(d.alarm){alarmDot.className='alarm-dot active';alarmLabel.textContent='Alarm: Triggered!'}else{alarmDot.className='alarm-dot';alarmLabel.textContent='Alarm: Inactive'}}catch(e){sensorFailCount++;document.getElementById('connDot').className='conn-dot fail';document.getElementById('connText').textContent='Connection error';document.getElementById('sTemp').textContent='--';document.getElementById('sHum').textContent='--';document.getElementById('sLight').textContent='--';document.getElementById('sGas').textContent='--';if(sensorFailCount>=3){sensorStopped=true;document.getElementById('sensorBanner').classList.add('show');return}}scheduleSensorPoll()}function scheduleSensorPoll(){if(sensorTimer)clearTimeout(sensorTimer);const delay=Math.min(3000*Math.pow(2,sensorFailCount),30000);sensorTimer=setTimeout(loadSensors,delay)}function retrySensorPoll(){sensorStopped=false;sensorFailCount=0;document.getElementById('sensorBanner').classList.remove('show');loadSensors()}
 async function toggleDev(name){const btn=document.getElementById('dev'+(name.charAt(0).toUpperCase()+name.slice(1)));const on=btn.classList.contains('off');btn.className='toggle-sw '+(on?'on':'off');btn.textContent=on?'ON':'OFF';try{await fetch('/smarthome/device?csrf='+CSRFToken,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({device:name,status:on})})}catch(e){}}
 async function toggleAlarm(){const btn=document.getElementById('devAlarm');const on=btn.classList.contains('off');btn.className='toggle-sw '+(on?'on':'off');btn.textContent=on?'ON':'OFF';try{await fetch('/smarthome/alarm?csrf='+CSRFToken,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:on})})}catch(e){}}
 async function setSmart(mode){document.querySelectorAll('.smart-mode button').forEach(b=>b.classList.remove('active'));document.getElementById(['smartOff','smartLdr','smartPir'][mode]).classList.add('active');try{await fetch('/smarthome/smart?csrf='+CSRFToken,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:mode})})}catch(e){}}
@@ -716,7 +718,7 @@ async function loadDevices(){try{const r=await fetch('/devices');const devs=awai
 async function addScene(){const device=document.getElementById('sceneDevice').value;const btn=document.getElementById('sceneBtn').value.trim();const target=document.getElementById('sceneTarget').value;const state=document.getElementById('sceneState').value==='true';if(!device||!btn)return;await fetch('/scenes?csrf='+CSRFToken,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:device+' → '+btn,trigger:{device,btn},action:{type:'device',device:target,state}})});loadScenes();document.getElementById('sceneBtn').value=''}
 async function loadScenes(){try{const r=await fetch('/scenes');const scenes=await r.json();const list=document.getElementById('sceneList');list.innerHTML='';scenes.forEach(s=>{const card=document.createElement('div');card.className='scene-card';card.innerHTML='<div><div class="sc-name">'+s.name+'</div><div class="sc-trigger">'+s.trigger.device+' / '+s.trigger.btn+' → '+s.action.device+'</div></div><button class="sc-del" onclick="deleteScene(\''+s.id+'\')">✕</button>';list.appendChild(card)})}catch(e){}}
 async function deleteScene(id){await fetch('/scenes?id='+encodeURIComponent(id)+'&csrf='+CSRFToken,{method:'DELETE'});loadScenes()}
-loadDevices();loadSensors();loadScenes();if(sensorPoll)clearInterval(sensorPoll);sensorPoll=setInterval(loadSensors,3000);
+loadDevices();loadScenes();loadSensors();
 </script>
 </body></html>
 )rawliteral");
@@ -1137,17 +1139,17 @@ function openPanel(devId){const dev=DEVICES.find(d=>d.id===devId);if(!dev)return
 function closePanel(){document.getElementById('remotePanel').classList.remove('open');document.getElementById('panelBg').classList.remove('show');openDeviceId=null;learnModeOn=false;document.getElementById('rpLearnBtn').classList.remove('on');document.getElementById('rpLearnBtn').textContent='Learn'}
 function renderPanelBtns(dev){const grid=document.getElementById('rpBtns');grid.innerHTML='';dev.btns.forEach(btn=>{const b=document.createElement('button');b.className='ir-btn'+(btn.learned?' learned':'');b.setAttribute('data-btn',btn.name);b.innerHTML='<span class="bi">'+btn.icon+'</span><span>'+btn.name+'</span>';b.onclick=()=>{if(learnModeOn){startLearnBtn(dev.id,btn.name,b)}else{sendIR(dev.id,btn.name,b)}};grid.appendChild(b)})}
 function toggleLearnMode(){learnModeOn=!learnModeOn;const btn=document.getElementById('rpLearnBtn');btn.classList.toggle('on',learnModeOn);btn.textContent=learnModeOn?'Cancel':'Learn';if(learnModeOn){showToast('Tap a button to teach',false)}else{showToast('Learn mode off',false)}}
-async function startLearnBtn(devId,btnName,btnEl){pendingLearnBtn={devId,btnName,el:btnEl};btnEl.classList.add('learn-target');document.getElementById('learnBtnName').textContent=btnName;document.getElementById('learnCountdown').textContent='15';document.getElementById('learnOverlay').classList.add('show');await fetch('/learn/start?device='+encodeURIComponent(devId)+'&btn='+encodeURIComponent(btnName)+'&csrf='+CSRFToken);startLearnPolling(15)}
+async function startLearnBtn(devId,btnName,btnEl){pendingLearnBtn={devId,btnName,el:btnEl};btnEl.classList.add('learn-target');document.getElementById('learnBtnName').textContent=btnName;document.getElementById('learnCountdown').textContent='15';document.getElementById('learnOverlay').classList.add('show');await fetch('/learn/start',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'device='+encodeURIComponent(devId)+'&btn='+encodeURIComponent(btnName)+'&csrf='+CSRFToken});startLearnPolling(15)}
 function startLearnPolling(sec){let remaining=sec;clearInterval(learnCdInterval);clearInterval(learnPolling);learnCdInterval=setInterval(()=>{remaining--;document.getElementById('learnCountdown').textContent=remaining;if(remaining<=0)clearInterval(learnCdInterval)},1000);learnPolling=setInterval(async()=>{try{const r=await fetch('/learn/status');const j=await r.json();if(j.status==='done'){clearInterval(learnPolling);clearInterval(learnCdInterval);onLearnSuccess()}else if(j.status==='timeout'||j.status==='idle'){clearInterval(learnPolling);clearInterval(learnCdInterval);onLearnTimeout()}}catch(e){}},500)}
 function onLearnSuccess(){document.getElementById('learnOverlay').classList.remove('show');if(pendingLearnBtn){pendingLearnBtn.el.classList.remove('learn-target');pendingLearnBtn.el.classList.add('learned');showToast('Code saved!',false);pendingLearnBtn=null}if(learnQueue.length>0){learnQueueIdx++;setTimeout(()=>processLearnQueue(),800)}else{learnModeOn=false;document.getElementById('rpLearnBtn').classList.remove('on');document.getElementById('rpLearnBtn').textContent='Learn'}loadDevices()}
 function onLearnTimeout(){document.getElementById('learnOverlay').classList.remove('show');if(pendingLearnBtn){pendingLearnBtn.el.classList.remove('learn-target');pendingLearnBtn=null}if(learnQueue.length>0){if(confirm('No signal received. Skip this button?')){learnQueueIdx++;setTimeout(()=>processLearnQueue(),400)}else{learnQueue=[];showToast('Learning stopped',true)}}else{showToast('No signal received',true)}}
-async function cancelLearn(){clearInterval(learnPolling);clearInterval(learnCdInterval);await fetch('/learn/cancel?csrf='+CSRFToken);document.getElementById('learnOverlay').classList.remove('show');if(pendingLearnBtn){pendingLearnBtn.el.classList.remove('learn-target');pendingLearnBtn=null}learnQueue=[];showToast('Learning cancelled',true)}
+async function cancelLearn(){clearInterval(learnPolling);clearInterval(learnCdInterval);await fetch('/learn/cancel',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'csrf='+CSRFToken});document.getElementById('learnOverlay').classList.remove('show');if(pendingLearnBtn){pendingLearnBtn.el.classList.remove('learn-target');pendingLearnBtn=null}learnQueue=[];showToast('Learning cancelled',true)}
 async function sendIR(devId,btnName,el){el.classList.add('sent');try{const r=await fetch('/ir?device='+encodeURIComponent(devId)+'&btn='+encodeURIComponent(btnName));await r.json();showToast(btnName,false)}catch(e){showToast('Error sending',true)}setTimeout(()=>el.classList.remove('sent'),800)}
 function openAddModal(){selectedAddBtns.clear();renderBtnPicker();document.getElementById('newDevName').value='';document.getElementById('newDevBrand').value='';document.getElementById('addModal').classList.add('show')}
 function closeAddModal(){document.getElementById('addModal').classList.remove('show')}
 function renderBtnPicker(){const grid=document.getElementById('btnPickerGrid');grid.innerHTML='';PRESET_BTNS.forEach(b=>{const el=document.createElement('div');el.className='btn-add-btn'+(selectedAddBtns.has(b.name)?' sel':'');el.innerHTML=b.icon+' '+b.name;el.onclick=()=>{selectedAddBtns.has(b.name)?selectedAddBtns.delete(b.name):selectedAddBtns.add(b.name);renderBtnPicker()};grid.appendChild(el)})}
 function startAddDevice(){const name=document.getElementById('newDevName').value.trim();const brand=document.getElementById('newDevBrand').value.trim();const cat=document.getElementById('newDevCat').value;if(!name||!brand){showToast('Enter name and brand',true);return}if(selectedAddBtns.size===0){showToast('Select at least one button',true);return}const id='custom_'+Date.now();addDeviceData={id,name,brand,cat};learnQueue=Array.from(selectedAddBtns).map(bName=>{const preset=PRESET_BTNS.find(p=>p.name===bName);return{devId:id,btnName:bName,icon:preset?preset.icon:'•'}});learnQueueIdx=0;closeAddModal();const catMap={tv:'TV',ac:'AC',other:'Other'};DEVICES.push({id,name,brand,cat,catLabel:catMap[cat],btns:learnQueue.map(l=>({name:l.btnName,icon:l.icon,learned:false}))});renderAll();openPanel(id);setTimeout(()=>processLearnQueue(),600)}
-async function processLearnQueue(){if(learnQueueIdx>=learnQueue.length){showToast('All buttons learned!',false);learnQueue=[];return}const item=learnQueue[learnQueueIdx];const btnEls=document.querySelectorAll('#rpBtns .ir-btn');let btnEl=null;btnEls.forEach(el=>{if(el.getAttribute('data-btn')===item.btnName)btnEl=el});pendingLearnBtn={devId:item.devId,btnName:item.btnName,el:btnEl};if(btnEl)btnEl.classList.add('learn-target');document.getElementById('learnBtnName').textContent=item.btnName;document.getElementById('learnCountdown').textContent='15';document.getElementById('learnOverlay').classList.add('show');await fetch('/learn/start?device='+encodeURIComponent(item.devId)+'&btn='+encodeURIComponent(item.btnName)+'&csrf='+CSRFToken);startLearnPolling(15)}
+async function processLearnQueue(){if(learnQueueIdx>=learnQueue.length){showToast('All buttons learned!',false);learnQueue=[];return}const item=learnQueue[learnQueueIdx];const btnEls=document.querySelectorAll('#rpBtns .ir-btn');let btnEl=null;btnEls.forEach(el=>{if(el.getAttribute('data-btn')===item.btnName)btnEl=el});pendingLearnBtn={devId:item.devId,btnName:item.btnName,el:btnEl};if(btnEl)btnEl.classList.add('learn-target');document.getElementById('learnBtnName').textContent=item.btnName;document.getElementById('learnCountdown').textContent='15';document.getElementById('learnOverlay').classList.add('show');await fetch('/learn/start',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'device='+encodeURIComponent(item.devId)+'&btn='+encodeURIComponent(item.btnName)+'&csrf='+CSRFToken});startLearnPolling(15)}
 function showToast(msg,err){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show';setTimeout(()=>t.classList.remove('show'),2200)}
 function toggleMenu(){document.getElementById('topNav').classList.toggle('open')}
 fetch('/csrf').then(r=>r.json()).then(d=>CSRFToken=d.token);

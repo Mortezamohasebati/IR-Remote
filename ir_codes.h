@@ -1,20 +1,7 @@
 #pragma once
 #include <Arduino.h>
 #include <Preferences.h>
-
-// ── Protocols ────────────────────────────────────────────────
-enum IRProtocol {
-  PROTO_NEC,
-  PROTO_SAMSUNG,
-  PROTO_SONY,
-  PROTO_RC5,
-  PROTO_RC6,
-  PROTO_LG,
-  PROTO_SHARP,
-  PROTO_PANASONIC,
-  PROTO_RCA,
-  PROTO_UNKNOWN
-};
+#include <IRremoteESP8266.h>
 
 // ── Button ──────────────────────────────────────────────────
 struct IRButton {
@@ -32,7 +19,7 @@ struct DeviceIR {
   const char* category;
   const char* brand;
   const char* catLabel;
-  IRProtocol  protocol;
+  decode_type_t  protocol;
   IRButton*   buttons;
   uint8_t     btnCount;
 };
@@ -124,6 +111,9 @@ IRButton philipsRC6TVBtns[] PROGMEM = {
   {"Back","\xe2\x86\xa9",0x001A,20,1}, {"Source","\xe2\x8e\x98",0x007B,20,1},
 };
 
+// TCL TV (North America/NEC) — UNVERIFIED
+// Source: community gist. Model unknown. Protocol inferred as NEC.
+// If codes do not work, use learn-mode to capture from your remote.
 IRButton tclTVBtns[] PROGMEM = {
   // TCL NEC variant — common for North America/Roku models (0x57E3 prefix)
   {"Power","\xe2\x8f\xbb",0x57E3E817,32,1}, {"Vol+","\xf0\x9f\x94\x8a",0x57E3F00F,32,1},
@@ -290,32 +280,16 @@ IRButton panasonicACBtns[] PROGMEM = {
   {"Sleep","\xf0\x9f\x98\xb4",0x340034002020LL,48,1},
 };
 
-IRButton daikinACBtns[] PROGMEM = {
-  {"Power","\xe2\x8f\xbb",0x1100100,28,1},
-  {"Cool","\xe2\x9d\x84",0x1100110,28,1},
-  {"Heat","\xf0\x9f\x94\xa5",0x1100140,28,1},
-  {"Fan","\xf0\x9f\x92\xa8",0x1100160,28,1},
-  {"Dry","\xf0\x9f\x92\xa7",0x1100120,28,1},
-  {"Temp+","\xf0\x9f\x8c\xa1",0x1100101,28,1},
-  {"Temp-","\xf0\x9f\x8c\xa1",0x1100102,28,1},
-  {"Fan+","\xf0\x9f\x92\xa8",0x1100104,28,1},
-  {"Fan-","\xf0\x9f\x92\xa8",0x1100108,28,1},
-  {"Swing","\xe2\x86\x95",0x1100150,28,1},
-  {"Sleep","\xf0\x9f\x98\xb4",0x1100180,28,1},
-};
-
-IRButton mitsubishiACBtns[] PROGMEM = {
-  {"Power","\xe2\x8f\xbb",0x4FB7080F7,34,1},
-  {"Cool","\xe2\x9d\x84",0x4FB708AF7,34,1},
-  {"Heat","\xf0\x9f\x94\xa5",0x4FB7098F7,34,1},
-  {"Fan","\xf0\x9f\x92\xa8",0x4FB70A0F7,34,1},
-  {"Dry","\xf0\x9f\x92\xa7",0x4FB70B8F7,34,1},
-  {"Temp+","\xf0\x9f\x8c\xa1",0x4FB7010EF,34,1},
-  {"Temp-","\xf0\x9f\x8c\xa1",0x4FB7090F7,34,1},
-  {"Fan+","\xf0\x9f\x92\xa8",0x4FB7040BF,34,1},
-  {"Fan-","\xf0\x9f\x92\xa8",0x4FB70C0F3,34,1},
-  {"Swing","\xe2\x86\x95",0x4FB7038C7,34,1},
-};
+// Daikin AC intentionally omitted from static offline pack.
+// Daikin uses IRDaikin2 — 28/32-bit stateful protocol.
+// Cannot be represented as a static hex code reliably.
+// User must use learn-mode to capture codes from their physical remote,
+// OR use the irdb live fetch which handles this via raw pulse arrays.
+// Mitsubishi Electric AC intentionally omitted from static offline pack.
+// Mitsubishi uses IRMitsubishiAC — stateful proprietary protocol.
+// Cannot be represented as a static hex code reliably.
+// User must use learn-mode to capture codes from their physical remote,
+// OR use the irdb live fetch which handles this via raw pulse arrays.
 
 IRButton greeACBtns[] PROGMEM = {
   {"Power","\xe2\x8f\xbb",0x9B25F00000LL,48,1},  {"Cool 18\xc2\xb0","\xe2\x9d\x84",0x9B09F00000LL,48,1},
@@ -336,17 +310,11 @@ IRButton mideaACBtns[] PROGMEM = {
 };
 // VERIFY: Midea AC codes are generic NEC; some models use proprietary Midea protocol
 
-IRButton haierACBtns[] PROGMEM = {
-  // Haier AC — uses Haier-specific protocol (not standard NEC)
-  // IRremoteESP8266 has dedicated IRHaierAC176 class for full control
-  {"Power","\xe2\x8f\xbb",0xA1,8,1},  {"Cool","\xe2\x9d\x84",0xB1,8,1},
-  {"Heat","\xf0\x9f\x94\xa5",0xB2,8,1},  {"Fan","\xf0\x9f\x92\xa8",0xB3,8,1},
-  {"Auto","\xe2\x99\xbb",0xB0,8,1},   {"Dry","\xf0\x9f\x92\xa7",0xB5,8,1},
-  {"Temp+","\xf0\x9f\x8c\xa1",0xC1,8,1}, {"Temp-","\xf0\x9f\x8c\xa1",0xC2,8,1},
-  {"Fan+","\xf0\x9f\x92\xa8",0xD1,8,1},  {"Swing","\xe2\x86\x95",0xE1,8,1},
-};
-// VERIFY: Haier AC uses stateful 176-bit protocol; these are placeholder codes
-// Use IRHaierAC176 class for proper control instead of sendCode()
+// Haier AC intentionally omitted from static offline pack.
+// Haier uses IRHaierAC176 — 176-bit stateful protocol.
+// Cannot be represented as a static hex code.
+// User must use learn-mode to capture codes from their physical remote,
+// OR use the irdb live fetch which handles this via raw pulse arrays.
 
 // ── Iranian ACs ────────────────────────────────────────────
 
@@ -473,51 +441,50 @@ IRButton fanBtns[] PROGMEM = {
 
 const DeviceIR devices[] PROGMEM = {
   // ── International TVs ──
-  {"samsung_tv",   "Samsung TV",    "tv", "Samsung",   "TV", PROTO_SAMSUNG,   samsungTVBtns,     17},
-  {"lg_tv",        "LG TV",         "tv", "LG",        "TV", PROTO_NEC,       lgTVBtns,          16},
-  {"sony_tv",      "Sony TV",       "tv", "Sony",      "TV", PROTO_SONY,      sonyTVBtns,        14},
-  {"philips_tv",   "Philips TV",    "tv", "Philips",   "TV", PROTO_RC5,       philipsTVBtns,     13},
-  {"philips_tv_rc6","Philips TV RC6","tv","Philips",   "TV", PROTO_RC6,       philipsRC6TVBtns,  14},
-  {"tcl_tv_nec",   "TCL TV (NEC)",  "tv", "TCL",       "TV", PROTO_NEC,       tclTVBtns,         16},
-  {"tcl_tv_rca",   "TCL TV (RCA)",  "tv", "TCL",       "TV", PROTO_RCA,       tclTVRcaBtns,      14},
-  {"hisense_tv",   "Hisense TV",    "tv", "Hisense",   "TV", PROTO_NEC,       hisenseTVBtns,     14},
-  {"xiaomi_tv",    "Xiaomi TV",     "tv", "Xiaomi",    "TV", PROTO_NEC,       xiaomiTVBtns,      15},
-  {"panasonic_tv", "Panasonic TV",  "tv", "Panasonic", "TV", PROTO_PANASONIC, panasonicTVBtns,   15},
+  {"samsung_tv",   "Samsung TV",    "tv", "Samsung",   "TV", SAMSUNG,        samsungTVBtns,     17},
+  {"lg_tv",        "LG TV",         "tv", "LG",        "TV", NEC,            lgTVBtns,          16},
+  {"sony_tv",      "Sony TV",       "tv", "Sony",      "TV", SONY,           sonyTVBtns,        14},
+  {"philips_tv",   "Philips TV",    "tv", "Philips",   "TV", RC5,            philipsTVBtns,     13},
+  {"philips_tv_rc6","Philips TV RC6","tv","Philips",   "TV", RC6,            philipsRC6TVBtns,  14},
+  {"tcl_tv_nec",   "TCL TV (NEC)",  "tv", "TCL",       "TV", NEC,            tclTVBtns,         16},
+  {"tcl_tv_rca",   "TCL TV (RCA)",  "tv", "TCL",       "TV", NEC,            tclTVRcaBtns,      14},
+  {"hisense_tv",   "Hisense TV",    "tv", "Hisense",   "TV", NEC,            hisenseTVBtns,     14},
+  {"xiaomi_tv",    "Xiaomi TV",     "tv", "Xiaomi",    "TV", NEC,            xiaomiTVBtns,      15},
+  {"panasonic_tv", "Panasonic TV",  "tv", "Panasonic", "TV", PANASONIC,      panasonicTVBtns,   15},
 
   // ── Iranian TVs ──
-  {"snowa_tv",     "Snowa TV",      "tv", "Snowa",     "TV", PROTO_NEC,       snowaTVBtns,       14},
-  {"pakshoma_tv",  "Pakshoma TV",   "tv", "Pakshoma",  "TV", PROTO_NEC,       pakshomaTVBtns,    13},
-  {"parskhazar",   "Pars Khazar TV","tv", "Pars Khazar","TV", PROTO_NEC,      parsKhazarTVBtns,  10},
-  {"xvision_tv",   "XVision TV",    "tv", "XVision",   "TV", PROTO_SAMSUNG,   xvisionTVBtns,     14},
-  {"gplus_tv",     "G-Plus TV",     "tv", "G-Plus",    "TV", PROTO_NEC,       gplusTVBtns,       13},
-  {"emersan_tv",   "Emersan TV",    "tv", "Emersan",   "TV", PROTO_SAMSUNG,   emersanTVBtns,     11},
-  {"daewoo_tv",    "Daewoo TV",     "tv", "Daewoo",    "TV", PROTO_NEC,       daewooTVBtns,      11},
+  {"snowa_tv",     "Snowa TV",      "tv", "Snowa",     "TV", NEC,            snowaTVBtns,       14},
+  {"pakshoma_tv",  "Pakshoma TV",   "tv", "Pakshoma",  "TV", NEC,            pakshomaTVBtns,    13},
+  {"parskhazar",   "Pars Khazar TV","tv", "Pars Khazar","TV", NEC,           parsKhazarTVBtns,  10},
+  {"xvision_tv",   "XVision TV",    "tv", "XVision",   "TV", SAMSUNG,        xvisionTVBtns,     14},
+  {"gplus_tv",     "G-Plus TV",     "tv", "G-Plus",    "TV", NEC,            gplusTVBtns,       13},
+  {"emersan_tv",   "Emersan TV",    "tv", "Emersan",   "TV", SAMSUNG,        emersanTVBtns,     11},
+  {"daewoo_tv",    "Daewoo TV",     "tv", "Daewoo",    "TV", NEC,            daewooTVBtns,      11},
 
   // ── International ACs ──
-  {"samsung_ac",   "Samsung AC",    "ac", "Samsung",   "AC", PROTO_SAMSUNG,   samsungACBtns,     11},
-  {"lg_ac",        "LG AC",         "ac", "LG",        "AC", PROTO_NEC,       lgACBtns,          12},
-  {"panasonic_ac", "Panasonic AC",  "ac", "Panasonic", "AC", PROTO_PANASONIC, panasonicACBtns,   12},
-  {"daikin_ac",    "Daikin AC",     "ac", "Daikin",    "AC", PROTO_NEC,       daikinACBtns,      11},
-  {"mitsubishi_ac","Mitsubishi AC", "ac", "Mitsubishi","AC", PROTO_NEC,       mitsubishiACBtns,  10},
-  {"gree_ac",      "Gree AC",       "ac", "Gree",      "AC", PROTO_NEC,       greeACBtns,        12},
-  {"midea_ac",     "Midea AC",      "ac", "Midea",     "AC", PROTO_NEC,       mideaACBtns,       10},
-  {"haier_ac",     "Haier AC",      "ac", "Haier",     "AC", PROTO_NEC,       haierACBtns,       10},
+  {"samsung_ac",   "Samsung AC",    "ac", "Samsung",   "AC", SAMSUNG,        samsungACBtns,     11},
+  {"lg_ac",        "LG AC",         "ac", "LG",        "AC", NEC,            lgACBtns,          12},
+  {"panasonic_ac", "Panasonic AC",  "ac", "Panasonic", "AC", PANASONIC,      panasonicACBtns,   12},
+  // Daikin AC — removed: uses IRDaikin2 stateful protocol, not representable as static hex
+  // Mitsubishi AC — removed: uses IRMitsubishiAC stateful protocol, not representable as static hex
+  {"gree_ac",      "Gree AC",       "ac", "Gree",      "AC", NEC,            greeACBtns,        12},
+  {"midea_ac",     "Midea AC",      "ac", "Midea",     "AC", NEC,            mideaACBtns,       10},
 
   // ── Iranian ACs ──
-  {"snowa_ac",     "Snowa AC",      "ac", "Snowa",     "AC", PROTO_NEC,       snowaACBtns,       12},
-  {"entekhab_ac",  "Entekhab AC",   "ac", "Entekhab",  "AC", PROTO_NEC,       entekhabACBtns,    11},
-  {"depoo_ac",     "Depoo AC",      "ac", "Depoo",     "AC", PROTO_NEC,       depooACBtns,       11},
-  {"electrostil_ac","Electrostil AC","ac","Electrostil","AC", PROTO_NEC,      electrostilACBtns,  9},
-  {"pakshoma_ac",  "Pakshoma AC",   "ac", "Pakshoma",  "AC", PROTO_NEC,       pakshomaACBtns,    11},
+  {"snowa_ac",     "Snowa AC",      "ac", "Snowa",     "AC", NEC,            snowaACBtns,       12},
+  {"entekhab_ac",  "Entekhab AC",   "ac", "Entekhab",  "AC", NEC,            entekhabACBtns,    11},
+  {"depoo_ac",     "Depoo AC",      "ac", "Depoo",     "AC", NEC,            depooACBtns,       11},
+  {"electrostil_ac","Electrostil AC","ac","Electrostil","AC", NEC,           electrostilACBtns,  9},
+  {"pakshoma_ac",  "Pakshoma AC",   "ac", "Pakshoma",  "AC", NEC,            pakshomaACBtns,    11},
 
   // ── Other ──
-  {"epson_proj",   "Epson Proj",    "other","Epson",   "Projector", PROTO_NEC, epsonProjBtns,    15},
-  {"benq_proj",    "BenQ Proj",     "other","BenQ",    "Projector", PROTO_NEC, benqProjBtns,     15},
-  {"xiaomi_proj",  "Xiaomi Proj",   "other","Xiaomi",  "Projector", PROTO_NEC, xiaomiProjBtns,   13},
-  {"settop",       "Set-Top Box",   "other","Generic",  "STB",      PROTO_NEC, setTopBoxBtns,    14},
-  {"dvd",          "DVD Player",    "other","Generic",  "DVD",      PROTO_NEC, dvdPlayerBtns,    13},
-  {"av_receiver",  "A/V Receiver",  "other","Generic",  "A/V",      PROTO_NEC, avReceiverBtns,   13},
-  {"fan",          "Smart Fan",     "other","Generic",  "Fan",      PROTO_NEC, fanBtns,           8},
+  {"epson_proj",   "Epson Proj",    "other","Epson",   "Projector", NEC, epsonProjBtns,       15},
+  {"benq_proj",    "BenQ Proj",     "other","BenQ",    "Projector", NEC, benqProjBtns,        15},
+  {"xiaomi_proj",  "Xiaomi Proj",   "other","Xiaomi",  "Projector", NEC, xiaomiProjBtns,      13},
+  {"settop",       "Set-Top Box",   "other","Generic",  "STB",      NEC, setTopBoxBtns,       14},
+  {"dvd",          "DVD Player",    "other","Generic",  "DVD",      NEC, dvdPlayerBtns,       13},
+  {"av_receiver",  "A/V Receiver",  "other","Generic",  "A/V",      NEC, avReceiverBtns,      13},
+  {"fan",          "Smart Fan",     "other","Generic",  "Fan",      NEC, fanBtns,              8},
 };
 
 const uint8_t DEVICE_COUNT = sizeof(devices) / sizeof(devices[0]);
