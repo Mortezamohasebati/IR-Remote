@@ -72,7 +72,7 @@ bool loadLearnedCode(String devId, String btnName, uint64_t &code, uint8_t &bits
   uint32_t lo = strtoul(val.substring(c1+1,c2).c_str(), nullptr, 16);
   code  = ((uint64_t)hi << 32) | lo;
   bits  = val.substring(c2+1, c3).toInt();
-  proto = val.substring(c3+1).toInt();
+  proto = (decode_type_t)val.substring(c3+1).toInt();
   return true;
 }
 
@@ -86,18 +86,8 @@ void deleteLearnedCode(String devId, String btnName) {
 
 void sendCode(decode_type_t proto, uint64_t code, uint8_t bits, uint8_t repeat) {
   for (int r = 0; r < repeat; r++) {
-    switch (proto) {
-      case NEC:        irsend.sendNEC(code, bits);        break;
-      case SAMSUNG:    irsend.sendSAMSUNG(code, bits);    break;
-      case SONY:       irsend.sendSony(code, bits);       break;
-      case LG:         irsend.sendLG(code, bits);         break;
-      case RC5:        irsend.sendRC5(code, bits);        break;
-      case SHARP:      irsend.sendSharpRaw(code, bits);   break;
-      case RC6:        irsend.sendRC6(code, bits);        break;
-      case PANASONIC:  irsend.sendPanasonic(bits, code);  break;
-      default:         irsend.sendNEC(code, bits);        break;
-    }
-    if (repeat > 1) delay(45);
+    irsend.send(proto, code, bits);
+    if (repeat > 1) delayMicroseconds(40000);
   }
 }
 
