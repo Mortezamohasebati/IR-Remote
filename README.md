@@ -70,8 +70,7 @@ The circuit is built around three parts on the breadboard:
 
 ```
 IR-Remote/
-├── docs/
-│   └── wiring-diagram.png  # Fritzing breadboard diagram
+├── wiring-diagram.png  # Fritzing breadboard diagram
 ├── firmware/
 │   ├── main.ino             # ESP32 main sketch — WiFi, MQTT, IR send/receive, learning
 │   └── ir_codes.h            # Device, button, and IR protocol definitions
