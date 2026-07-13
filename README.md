@@ -55,7 +55,7 @@ Here's how a request flows through the system:
 ## 🔧 Wiring Diagram
 
 <div align="center">
-<img src="docs/wiring-diagram.png" alt="IR Remote breadboard wiring diagram" width="800">
+<img src="https://github.com/Mortezamohasebati/IR-Remote/blob/main/wiring-diagram.png" alt="IR Remote breadboard wiring diagram" width="800">
 </div>
 
 The circuit is built around three parts on the breadboard:
