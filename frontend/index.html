@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>IR Remote</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">📡</div>
+    <div class="logo-text">IR <span>Remote</span></div>
+  </div>
+  <div class="hdr-right">
+    <div class="dot"></div>
+  </div>
+</header>
+
+<!-- Tab bar -->
+<div class="tab-bar">
+  <div class="tab active" data-cat="tv" onclick="switchTab('tv',this)">
+    <span class="tab-icon">📺</span>تلویزیون
+  </div>
+  <div class="tab" data-cat="ac" onclick="switchTab('ac',this)">
+    <span class="tab-icon">❄️</span>کولر گازی
+  </div>
+  <div class="tab" data-cat="other" onclick="switchTab('other',this)">
+    <span class="tab-icon">📽️</span>سایر
+  </div>
+</div>
+
+<div class="container">
+  <div class="brand-bar" id="brandBar"></div>
+  <div class="device-grid" id="deviceGrid"></div>
+</div>
+
+<!-- Remote panel -->
+<div class="panel-bg" id="panelBg" onclick="closePanel()"></div>
+<div class="remote-panel" id="remotePanel">
+  <div class="rp-handle"></div>
+  <div class="rp-header">
+    <span class="rp-title" id="rpTitle">—</span>
+    <div class="rp-actions">
+      <button class="rp-learn-btn" id="rpLearnBtn" onclick="toggleLearnMode()">📡 یادگیری</button>
+      <button class="rp-close" onclick="closePanel()">✕ بستن</button>
+    </div>
+  </div>
+  <div class="btns-grid" id="rpBtns"></div>
+</div>
+
+<!-- Learn overlay -->
+<div class="learn-overlay" id="learnOverlay">
+  <div class="learn-box">
+    <div class="lb-icon">📡</div>
+    <h3>منتظر سیگنال IR</h3>
+    <p>ریموت اصلی را جلوی گیرنده بگیر و دکمه <strong id="learnBtnName">—</strong> را بزن</p>
+    <div class="countdown" id="learnCountdown">15</div>
+    <button class="lb-cancel" onclick="cancelLearn()">لغو</button>
+  </div>
+</div>
+
+<!-- Add device modal -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal-box">
+    <div class="modal-handle"></div>
+    <div class="modal-title">➕ اضافه کردن دستگاه جدید</div>
+
+    <div class="form-row">
+      <label>نام دستگاه</label>
+      <input type="text" id="newDevName" placeholder="مثلاً: پروژکتور اتاق">
+    </div>
+    <div class="form-row">
+      <label>برند</label>
+      <input type="text" id="newDevBrand" placeholder="مثلاً: Epson">
+    </div>
+    <div class="form-row">
+      <label>دسته‌بندی</label>
+      <select id="newDevCat">
+        <option value="tv">📺 تلویزیون</option>
+        <option value="ac">❄️ کولر گازی</option>
+        <option value="other">📽️ سایر</option>
+      </select>
+    </div>
+
+    <div class="form-row">
+      <label>دکمه‌هایی که می‌خوای یاد بگیری (انتخاب کن)</label>
+      <div class="btns-add-row" id="btnPickerGrid"></div>
+    </div>
+
+    <button class="modal-submit" onclick="startAddDevice()">✔ شروع یادگیری دکمه‌ها</button>
+    <button class="modal-cancel" onclick="closeAddModal()">انصراف</button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
